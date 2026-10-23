@@ -17,8 +17,6 @@ import {
     ArrowSquareOut,
 } from "@phosphor-icons/react";
 
-// --- TIỆN ÍCH HỖ TRỢ TRUY VẤN API MIỄN PHÍ ---
-
 function extractDomain(rawInput) {
     let clean = rawInput.trim().toLowerCase();
     try {
@@ -47,14 +45,12 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 4000) {
     }
 }
 
-// --- THUẬT TOÁN KIỂM TRA URL & TÊN MIỀN ---
 async function checkUrl(url) {
     const domain = extractDomain(url);
     const reasons = [];
     const info = [];
-    let riskScore = 0; // 0 - 100
+    let riskScore = 0;
 
-    // 1. Phân tích Heuristic & Đuôi tên miền (TLD rủi ro cao)
     const highRiskTlds =
         /\.(xyz|top|tk|ml|ga|cf|gq|club|work|click|buzz|rest|cam|live|fit|online|site|icu|vip)$/i;
     if (highRiskTlds.test(domain)) {
@@ -64,7 +60,6 @@ async function checkUrl(url) {
         riskScore += 25;
     }
 
-    // Kiểm tra giả mạo thương hiệu lớn tại Việt Nam
     const brandPatterns = [
         {
             regex: /vietcom|vcb/i,
@@ -109,7 +104,6 @@ async function checkUrl(url) {
         }
     }
 
-    // Từ khóa bẫy tâm lý lừa đảo
     const scamKeywords =
         /(login|verify|secure|update|confirm|banking|account|xac-thuc|dang-nhap|khoa-the|nhan-qua|quatang|daugia|sodothuong)/i;
     if (scamKeywords.test(domain)) {
@@ -119,7 +113,6 @@ async function checkUrl(url) {
         riskScore += 20;
     }
 
-    // Kiểm tra định dạng IP hoặc nhiều subdomain
     if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(domain)) {
         reasons.push(
             "Trang web dùng trực tiếp địa chỉ IP số thay vì tên miền chữ chuẩn",
@@ -132,7 +125,6 @@ async function checkUrl(url) {
         riskScore += 15;
     }
 
-    // 2. Tra cứu Google Public DNS DoH API (Miễn phí, không key, CORS mở)
     let dnsIps = [];
     let isDomainAlive = false;
     try {
@@ -156,11 +148,10 @@ async function checkUrl(url) {
                 info.push(`Máy chủ phân giải IP: ${dnsIps.join(", ")}`);
             }
         }
-    } catch {
-        // Dự phòng khi mạng chập chờn
+    } catch (_err) {
+        void _err;
     }
 
-    // 3. Tra cứu Cloudflare Security DNS 1.1.1.2 (Quét mã độc / Phishing)
     try {
         const cfRes = await fetchWithTimeout(
             `https://security.cloudflare-dns.com/dns-query?name=${encodeURIComponent(domain)}&type=A`,
@@ -179,11 +170,10 @@ async function checkUrl(url) {
                 riskScore += 50;
             }
         }
-    } catch {
-        // Bỏ qua lỗi timeout
+    } catch (_err) {
+        void _err;
     }
 
-    // 4. Tra cứu ICANN RDAP (Tuổi thọ tên miền - Domain Age)
     let domainAgeText = null;
     let registrarName = null;
     try {
@@ -199,7 +189,9 @@ async function checkUrl(url) {
         if (rdapRes.ok) {
             const rdapData = await rdapRes.json();
             const events = rdapData.events || [];
-            const regEvent = events.find((e) => e.eventAction === "registration");
+            const regEvent = events.find(
+                (e) => e.eventAction === "registration",
+            );
             if (regEvent && regEvent.eventDate) {
                 const regDate = new Date(regEvent.eventDate);
                 const ageDays = Math.floor(
@@ -240,12 +232,13 @@ async function checkUrl(url) {
                 }
             }
         }
-    } catch {
-        // ccTLD như .vn do VNNIC quản lý, RDAP quốc tế sẽ chuyển hướng
+    } catch (_err) {
+        void _err;
     }
 
     const isDangerous = riskScore >= 45 || reasons.length >= 2;
-    const isSuspicious = !isDangerous && (riskScore >= 20 || reasons.length === 1);
+    const isSuspicious =
+        !isDangerous && (riskScore >= 20 || reasons.length === 1);
 
     return {
         input: url,
@@ -265,7 +258,6 @@ async function checkUrl(url) {
     };
 }
 
-// --- THUẬT TOÁN KIỂM TRA EMAIL ---
 async function checkEmail(email) {
     const cleanEmail = email.trim().toLowerCase();
     const parts = cleanEmail.split("@");
@@ -284,7 +276,6 @@ async function checkEmail(email) {
     let isDangerous = false;
     let isSuspicious = false;
 
-    // 1. Kiểm tra Email rác / tạm thời (Disposable/Temp Mail)
     const disposableDomains = [
         "mailinator.com",
         "tempmail.com",
@@ -314,7 +305,6 @@ async function checkEmail(email) {
         isDangerous = true;
     }
 
-    // 2. Kiểm tra Mạo danh thương hiệu qua Email miễn phí
     const freeProviders = [
         "gmail.com",
         "yahoo.com",
@@ -346,11 +336,12 @@ async function checkEmail(email) {
             );
             isDangerous = true;
         } else {
-            info.push(`Email thuộc nhà cung cấp công cộng uy tín (@${emailDomain})`);
+            info.push(
+                `Email thuộc nhà cung cấp công cộng uy tín (@${emailDomain})`,
+            );
         }
     }
 
-    // 3. Tra cứu máy chủ nhận thư (Bản ghi MX) qua Google Public DNS DoH
     let hasMx = false;
     let mxHosts = [];
     try {
@@ -380,8 +371,8 @@ async function checkEmail(email) {
                 isDangerous = true;
             }
         }
-    } catch {
-        // fallback
+    } catch (_err) {
+        void _err;
     }
 
     if (!isDangerous && reasons.length > 0) {
@@ -404,7 +395,6 @@ async function checkEmail(email) {
     };
 }
 
-// --- THUẬT TOÁN KIỂM TRA SỐ ĐIỆN THOẠI & ĐẦU SỐ ---
 async function checkPhone(phone) {
     const raw = phone.trim();
     let clean = raw.replace(/[\s\-.()]/g, "");
@@ -421,7 +411,6 @@ async function checkPhone(phone) {
     let carrier = null;
     let phoneType = "Số di động";
 
-    // 1. Kiểm tra đầu số quốc tế lừa đảo Wangiri / Vệ tinh
     if (raw.startsWith("+") && !raw.startsWith("+84")) {
         phoneType = "Số quốc tế";
         const highRiskPrefixes = [
@@ -457,7 +446,6 @@ async function checkPhone(phone) {
             isSuspicious = true;
         }
     } else {
-        // Số điện thoại Việt Nam
         const viettel = [
             "086",
             "096",
@@ -530,7 +518,9 @@ async function checkPhone(phone) {
             else if (landlinePrefix === "028")
                 info.push("Số cố định khu vực TP. Hồ Chí Minh (Mã vùng 028)");
             else if (landlinePrefix === "023")
-                info.push("Số cố định khu vực miền Trung (Đà Nẵng / Huế / ...)");
+                info.push(
+                    "Số cố định khu vực miền Trung (Đà Nẵng / Huế / ...)",
+                );
             else info.push("Số điện thoại bàn cố định nội địa");
         } else if (clean.startsWith("1900") || clean.startsWith("1800")) {
             phoneType = "Tổng đài dịch vụ cước";
@@ -543,7 +533,7 @@ async function checkPhone(phone) {
         }
 
         info.push(
-            "MỆNH LỆNH AN TOÀN: Công an, Viện kiểm sát, Tòa án TUYỆT ĐỐI không làm việc hoặc yêu cầu chuyển tiền qua điện thoại.",
+            "Lưu ý quan trọng: Cơ quan Công an và Viện kiểm sát tuyệt đối không làm việc hay yêu cầu chuyển tiền qua điện thoại.",
         );
     }
 
@@ -569,7 +559,8 @@ const tabs = [
         label: "Website",
         fullLabel: "Kiểm tra Website",
         icon: Globe,
-        placeholder: "Nhập tên miền hoặc link, ví dụ: vietcom-bank.com.verify.xyz",
+        placeholder:
+            "Nhập tên miền hoặc link, ví dụ: vietcom-bank.com.verify.xyz",
     },
     {
         id: "email",
@@ -598,10 +589,18 @@ function ResultCard({ result, type }) {
                 className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-900"
             >
                 <div className="flex items-start gap-3">
-                    <Warning size={22} weight="fill" className="text-amber-600 shrink-0 mt-0.5" />
+                    <Warning
+                        size={22}
+                        weight="fill"
+                        className="text-amber-600 shrink-0 mt-0.5"
+                    />
                     <div>
-                        <h3 className="font-bold text-base">Thông tin nhập chưa hợp lệ</h3>
-                        <p className="text-sm mt-1 text-amber-800">{result.error}</p>
+                        <h3 className="font-bold text-base">
+                            Thông tin nhập chưa hợp lệ
+                        </h3>
+                        <p className="text-sm mt-1 text-amber-800">
+                            {result.error}
+                        </p>
                     </div>
                 </div>
             </motion.div>
@@ -612,20 +611,20 @@ function ResultCard({ result, type }) {
     let statusText = "text-emerald-900";
     let StatusIcon = CheckCircle;
     let iconColor = "text-emerald-600";
-    let title = "Chưa phát hiện dấu hiệu lừa đảo nguy hiểm";
+    let title = "Chưa phát hiện dấu hiệu rủi ro";
 
     if (result.isDangerous) {
         statusBg = "border-red-200 bg-red-50/80";
         statusText = "text-red-900";
         StatusIcon = XCircle;
         iconColor = "text-red-600";
-        title = "CẢNH BÁO: Phát hiện nhiều dấu hiệu rủi ro cao!";
+        title = "Nguy hiểm: Phát hiện dấu hiệu rủi ro cao!";
     } else if (result.isSuspicious) {
         statusBg = "border-amber-200 bg-amber-50/80";
         statusText = "text-amber-900";
         StatusIcon = Warning;
         iconColor = "text-amber-600";
-        title = "CẦN LƯU Ý: Tồn tại yếu tố nghi vấn";
+        title = "Cần lưu ý: Tồn tại yếu tố nghi vấn";
     }
 
     return (
@@ -636,10 +635,16 @@ function ResultCard({ result, type }) {
             className={`mt-6 rounded-2xl border p-5 sm:p-6 ${statusBg}`}
         >
             <div className="flex items-start gap-3.5">
-                <StatusIcon size={26} weight="fill" className={`${iconColor} shrink-0 mt-0.5`} />
+                <StatusIcon
+                    size={26}
+                    weight="fill"
+                    className={`${iconColor} shrink-0 mt-0.5`}
+                />
                 <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
-                        <h3 className={`text-base sm:text-lg font-bold ${statusText}`}>
+                        <h3
+                            className={`text-base sm:text-lg font-bold ${statusText}`}
+                        >
                             {title}
                         </h3>
                         {type === "url" && result.riskScore > 0 && (
@@ -655,7 +660,6 @@ function ResultCard({ result, type }) {
                         )}
                     </div>
 
-                    {/* Metadata summary bar */}
                     <div className="flex flex-wrap gap-2 my-2.5">
                         {type === "url" && (
                             <>
@@ -665,14 +669,25 @@ function ResultCard({ result, type }) {
                                 </span>
                                 {result.domainAgeText && (
                                     <span className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-700 bg-white/90 px-2.5 py-1 rounded-lg border border-gray-200 shadow-xs">
-                                        <Clock size={13} className="text-orange-500 shrink-0" />
-                                        <span>Tuổi thọ tên miền: {result.domainAgeText}</span>
+                                        <Clock
+                                            size={13}
+                                            className="text-emerald-600 shrink-0"
+                                        />
+                                        <span>
+                                            Tuổi thọ tên miền:{" "}
+                                            {result.domainAgeText}
+                                        </span>
                                     </span>
                                 )}
                                 {result.registrarName && (
                                     <span className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-600 bg-white/90 px-2.5 py-1 rounded-lg border border-gray-200 shadow-xs break-all">
-                                        <CalendarBlank size={13} className="shrink-0" />
-                                        <span>Nhà đăng ký: {result.registrarName}</span>
+                                        <CalendarBlank
+                                            size={13}
+                                            className="shrink-0"
+                                        />
+                                        <span>
+                                            Nhà đăng ký: {result.registrarName}
+                                        </span>
                                     </span>
                                 )}
                             </>
@@ -686,11 +701,21 @@ function ResultCard({ result, type }) {
                                 </span>
                                 <span className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-700 bg-white/90 px-2.5 py-1 rounded-lg border border-gray-200 shadow-xs">
                                     {result.hasMx ? (
-                                        <ShieldCheck size={13} className="text-emerald-600 shrink-0" />
+                                        <ShieldCheck
+                                            size={13}
+                                            className="text-emerald-600 shrink-0"
+                                        />
                                     ) : (
-                                        <ShieldWarning size={13} className="text-red-500 shrink-0" />
+                                        <ShieldWarning
+                                            size={13}
+                                            className="text-red-500 shrink-0"
+                                        />
                                     )}
-                                    <span>{result.hasMx ? "Máy chủ nhận thư hợp lệ" : "Không có máy chủ nhận thư (Không thể gửi lại)"}</span>
+                                    <span>
+                                        {result.hasMx
+                                            ? "Máy chủ nhận thư hợp lệ"
+                                            : "Không có máy chủ nhận thư (Không thể gửi lại)"}
+                                    </span>
                                 </span>
                             </>
                         )}
@@ -705,7 +730,7 @@ function ResultCard({ result, type }) {
                                     <span>Loại: {result.phoneType}</span>
                                 </span>
                                 {result.carrier && (
-                                    <span className="inline-flex items-center gap-1.5 text-xs font-bold text-orange-600 bg-white/90 px-2.5 py-1 rounded-lg border border-gray-200 shadow-xs">
+                                    <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-white/90 px-2.5 py-1 rounded-lg border border-gray-200 shadow-xs">
                                         <span>Mạng: {result.carrier}</span>
                                     </span>
                                 )}
@@ -713,7 +738,6 @@ function ResultCard({ result, type }) {
                         )}
                     </div>
 
-                    {/* Dấu hiệu cảnh báo nguy hiểm */}
                     {result.reasons && result.reasons.length > 0 && (
                         <div className="mt-3.5 space-y-1.5">
                             <p className="text-xs font-bold text-red-900 uppercase tracking-wide">
@@ -733,7 +757,6 @@ function ResultCard({ result, type }) {
                         </div>
                     )}
 
-                    {/* Dấu hiệu xác thực / thông tin kỹ thuật */}
                     {result.info && result.info.length > 0 && (
                         <div className="mt-3.5 space-y-1.5">
                             <p className="text-xs font-bold text-gray-700 uppercase tracking-wide">
@@ -745,7 +768,10 @@ function ResultCard({ result, type }) {
                                         key={inf}
                                         className="text-xs sm:text-sm text-gray-700 flex items-start gap-2"
                                     >
-                                        <Info size={14} className="text-blue-500 shrink-0 mt-0.5" />
+                                        <Info
+                                            size={14}
+                                            className="text-blue-500 shrink-0 mt-0.5"
+                                        />
                                         <span>{inf}</span>
                                     </li>
                                 ))}
@@ -753,7 +779,6 @@ function ResultCard({ result, type }) {
                         </div>
                     )}
 
-                    {/* Quick action verification links */}
                     <div className="mt-5 pt-4 border-t border-gray-200/80 flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2.5">
                         {type === "url" && (
                             <>
@@ -761,7 +786,7 @@ function ResultCard({ result, type }) {
                                     href={result.chongluadaoUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="inline-flex items-center justify-center gap-1.5 text-xs sm:text-sm font-bold px-4 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white transition-colors shadow-xs"
+                                    className="inline-flex items-center justify-center gap-1.5 text-xs sm:text-sm font-bold min-h-[44px] px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white transition-colors shadow-xs"
                                 >
                                     <span>Quét sâu trên ChongLuaDao.vn</span>
                                     <ArrowSquareOut size={14} />
@@ -770,7 +795,7 @@ function ResultCard({ result, type }) {
                                     href={result.checklegitUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="inline-flex items-center justify-center gap-1.5 text-xs sm:text-sm font-semibold px-4 py-2.5 rounded-xl bg-white border border-gray-300 text-gray-800 hover:bg-gray-50 transition-colors"
+                                    className="inline-flex items-center justify-center gap-1.5 text-xs sm:text-sm font-semibold min-h-[44px] px-4 py-2.5 rounded-xl bg-white border border-gray-300 text-gray-800 hover:bg-gray-50 transition-colors"
                                 >
                                     <span>Tra cứu CheckLegit</span>
                                     <ArrowSquareOut size={14} />
@@ -784,7 +809,7 @@ function ResultCard({ result, type }) {
                                     href={result.chongluadaoUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="inline-flex items-center justify-center gap-1.5 text-xs sm:text-sm font-bold px-4 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white transition-colors shadow-xs"
+                                    className="inline-flex items-center justify-center gap-1.5 text-xs sm:text-sm font-bold min-h-[44px] px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white transition-colors shadow-xs"
                                 >
                                     <span>Tra cứu trên ChongLuaDao.vn</span>
                                     <ArrowSquareOut size={14} />
@@ -793,9 +818,11 @@ function ResultCard({ result, type }) {
                                     href={result.hibpUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="inline-flex items-center justify-center gap-1.5 text-xs sm:text-sm font-semibold px-4 py-2.5 rounded-xl bg-white border border-gray-300 text-gray-800 hover:bg-gray-50 transition-colors"
+                                    className="inline-flex items-center justify-center gap-1.5 text-xs sm:text-sm font-semibold min-h-[44px] px-4 py-2.5 rounded-xl bg-white border border-gray-300 text-gray-800 hover:bg-gray-50 transition-colors"
                                 >
-                                    <span>Tra cứu dữ liệu rò rỉ HaveIBeenPwned</span>
+                                    <span>
+                                        Tra cứu dữ liệu rò rỉ HaveIBeenPwned
+                                    </span>
                                     <ArrowSquareOut size={14} />
                                 </a>
                             </>
@@ -807,7 +834,7 @@ function ResultCard({ result, type }) {
                                     href={result.checklegitUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="inline-flex items-center justify-center gap-1.5 text-xs sm:text-sm font-bold px-4 py-2.5 rounded-xl bg-orange-500 text-white hover:bg-orange-600 transition-colors shadow-xs"
+                                    className="inline-flex items-center justify-center gap-1.5 text-xs sm:text-sm font-bold min-h-[44px] px-4 py-2.5 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-xs"
                                 >
                                     <span>Báo cáo trên CheckLegit</span>
                                     <ArrowSquareOut size={14} />
@@ -816,9 +843,18 @@ function ResultCard({ result, type }) {
                                     href={result.chongluadaoUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="inline-flex items-center justify-center gap-1.5 text-xs sm:text-sm font-semibold px-4 py-2.5 rounded-xl bg-white border border-gray-300 text-gray-800 hover:bg-gray-50 transition-colors"
+                                    className="inline-flex items-center justify-center gap-1.5 text-xs sm:text-sm font-semibold min-h-[44px] px-4 py-2.5 rounded-xl bg-white border border-gray-300 text-gray-800 hover:bg-gray-50 transition-colors"
                                 >
                                     <span>Xem cảnh báo ChongLuaDao</span>
+                                    <ArrowSquareOut size={14} />
+                                </a>
+                                <a
+                                    href={result.ncscUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center justify-center gap-1.5 text-xs sm:text-sm font-semibold min-h-[44px] px-4 py-2.5 rounded-xl bg-white border border-gray-300 text-gray-800 hover:bg-gray-50 transition-colors"
+                                >
+                                    <span>Báo cáo tới NCSC</span>
                                     <ArrowSquareOut size={14} />
                                 </a>
                             </>
@@ -852,7 +888,8 @@ export default function CheckerPage() {
         try {
             let res;
             if (activeTab === "url") res = await checkUrl(input.trim());
-            else if (activeTab === "email") res = await checkEmail(input.trim());
+            else if (activeTab === "email")
+                res = await checkEmail(input.trim());
             else res = await checkPhone(input.trim());
             setResult(res);
         } catch {
@@ -868,9 +905,8 @@ export default function CheckerPage() {
     return (
         <div className="min-h-[100dvh] bg-gray-50 py-10 md:py-16">
             <div className="mx-auto max-w-3xl px-4 sm:px-6">
-                {/* Header */}
                 <div className="flex items-center gap-3.5 mb-6 sm:mb-8">
-                    <div className="flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-2xl bg-orange-100 text-orange-600 shrink-0 shadow-xs">
+                    <div className="flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 shrink-0 shadow-xs">
                         <MagnifyingGlass size={22} weight="bold" />
                     </div>
                     <div>
@@ -878,15 +914,18 @@ export default function CheckerPage() {
                             Công cụ kiểm tra lừa đảo
                         </h1>
                         <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
-                            Tra cứu thời gian thực tuổi thọ tên miền, máy chủ DNS, bản ghi email và đầu số viễn thông
+                            Kiểm tra độ tin cậy của website, địa chỉ email hoặc
+                            số điện thoại theo thời gian thực
                         </p>
                     </div>
                 </div>
 
-                {/* Card Container */}
                 <div className="bg-white rounded-2xl sm:rounded-3xl border border-gray-200 shadow-xs p-4 sm:p-6 md:p-8">
-                    {/* Tabs */}
-                    <div role="tablist" aria-label="Hình thức kiểm tra" className="flex items-center gap-1.5 sm:gap-2 p-1.5 bg-gray-100 rounded-2xl mb-6">
+                    <div
+                        role="tablist"
+                        aria-label="Hình thức kiểm tra"
+                        className="flex items-center gap-1.5 sm:gap-2 p-1.5 bg-gray-100 rounded-2xl mb-6"
+                    >
                         {tabs.map((t) => {
                             const Icon = t.icon;
                             const isActive = activeTab === t.id;
@@ -897,45 +936,74 @@ export default function CheckerPage() {
                                     role="tab"
                                     aria-selected={isActive}
                                     onClick={() => handleTabChange(t.id)}
-                                    className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2 sm:py-2.5 px-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+                                    className={`flex-1 flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 px-2 min-h-[44px] rounded-xl text-xs sm:text-sm font-semibold transition-all active:scale-[0.98] cursor-pointer ${
                                         isActive
                                             ? "bg-white text-gray-950 shadow-xs"
                                             : "text-gray-500 hover:text-gray-900"
                                     }`}
                                 >
-                                    <Icon size={16} weight={isActive ? "fill" : "regular"} className="shrink-0" />
-                                    <span className="hidden sm:inline">{t.fullLabel}</span>
+                                    <Icon
+                                        size={16}
+                                        weight={isActive ? "fill" : "regular"}
+                                        className="shrink-0"
+                                    />
+                                    <span className="hidden sm:inline">
+                                        {t.fullLabel}
+                                    </span>
                                     <span className="sm:hidden">{t.label}</span>
                                 </button>
                             );
                         })}
                     </div>
 
-                    {/* Form */}
                     <form onSubmit={handleCheck} className="space-y-4">
                         <div>
-                            <label htmlFor="checker-input" className="block text-xs sm:text-sm font-bold text-gray-800 mb-2">
-                                Nhập thông tin cần đối soát:
+                            <label
+                                htmlFor="checker-input"
+                                className="block text-xs sm:text-sm font-bold text-gray-800 mb-2"
+                            >
+                                Nhập thông tin cần kiểm tra:
                             </label>
                             <input
                                 id="checker-input"
-                                type="text"
+                                type={
+                                    activeTab === "email"
+                                        ? "email"
+                                        : activeTab === "phone"
+                                          ? "tel"
+                                          : "text"
+                                }
+                                inputMode={
+                                    activeTab === "phone"
+                                        ? "tel"
+                                        : activeTab === "email"
+                                          ? "email"
+                                          : "url"
+                                }
+                                autoCapitalize="none"
+                                autoCorrect="off"
+                                spellCheck={false}
                                 value={input}
                                 onChange={(e) => setInput(e.target.value)}
                                 placeholder={tab?.placeholder}
-                                className="w-full px-4 py-3 rounded-xl border border-gray-300 text-sm sm:text-base text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 transition-all shadow-xs"
+                                className="w-full px-4 py-3.5 rounded-xl border border-gray-300 text-base text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all shadow-xs"
                             />
                         </div>
 
                         <button
                             type="submit"
                             disabled={loading || !input.trim()}
-                            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm sm:text-base font-bold transition-all shadow-md shadow-orange-500/20 active:scale-[0.99] cursor-pointer"
+                            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm sm:text-base font-bold transition-all shadow-md shadow-emerald-600/20 active:scale-[0.99] cursor-pointer"
                         >
                             {loading ? (
                                 <>
-                                    <Spinner size={18} className="animate-spin" />
-                                    <span>Đang tra cứu dữ liệu an ninh mạng...</span>
+                                    <Spinner
+                                        size={18}
+                                        className="animate-spin"
+                                    />
+                                    <span>
+                                        Đang tra cứu dữ liệu an ninh mạng...
+                                    </span>
                                 </>
                             ) : (
                                 <>
@@ -946,7 +1014,6 @@ export default function CheckerPage() {
                         </button>
                     </form>
 
-                    {/* Result */}
                     <ResultCard result={result} type={activeTab} />
                 </div>
             </div>

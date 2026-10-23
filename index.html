@@ -3,14 +3,46 @@
     <head>
         <meta charset="UTF-8" />
         <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Cẩm Nang Số - Phòng Chống Lừa Đảo Trực Tuyến | Dự Án STEM</title>
-        <meta name="description" content="Trang web STEM cẩm nang phòng chống lừa đảo trên không gian mạng: nhận biết chiêu trò, kiểm tra số điện thoại, URL, email và quiz kiến thức an toàn." />
+        <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+        />
+        <meta name="theme-color" content="#ffffff" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <title>Dự Án STEM Phòng Chống Lừa Đảo Trực Tuyến</title>
+        <meta
+            name="description"
+            content="Cẩm nang giáo dục phòng chống lừa đảo trực tuyến: nhận diện thủ đoạn, tra cứu liên kết, email, số điện thoại và trắc nghiệm phản xạ an toàn số."
+        />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-        <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800;900&display=swap"
+            rel="stylesheet"
+        />
+        <script type="text/javascript">
+            (function (l) {
+                if (l.search[1] === "/") {
+                    var decoded = l.search
+                        .slice(1)
+                        .split("&")
+                        .map(function (s) {
+                            return s.replace(/~and~/g, "&");
+                        })
+                        .join("?");
+                    window.history.replaceState(
+                        null,
+                        null,
+                        l.pathname.slice(0, -1) + decoded + l.hash,
+                    );
+                }
+            })(window.location);
+        </script>
     </head>
-    <body class="bg-white text-gray-900 antialiased selection:bg-orange-100 selection:text-orange-700">
+    <body
+        class="bg-white text-gray-900 antialiased selection:bg-emerald-100 selection:text-emerald-800"
+    >
         <div id="root"></div>
         <script type="module" src="/src/main.jsx"></script>
     </body>
